@@ -20,30 +20,28 @@ func NewAuthorization(c *OAuthConfigure, s *OAuthSimpleOption, e *echo.Echo) *Au
 	return &Authorization{c, s, e}
 }
 
-func (a *Authorization) CreateAuthRouter() {
+func (a *Authorization) CreateAuthRouter() *echo.Group {
 	authRouter := a.e.Group(a.options.AuthRouter)
 	authRouter.POST("/", a.LoginOAuth)
+
+	return authRouter
 }
 
 func (a *Authorization) LoginOAuth(c echo.Context) error {
-	grantType := ""
+	authBasic := new(OAuthBasic)
 
-	err := echo.QueryParamsBinder(c).
-		String("grant_type", &grantType).
-		BindError()
-
-	if err != nil {
-		c.JSON(http.StatusBadRequest, err)
+	if err := c.Bind(authBasic); err != nil {
+		c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
 		return err
 	}
 
-	if len(grantType) == 0 {
+	if len(authBasic.Grant_type) == 0 {
 		errorValue := "empty grant_type"
 		c.JSON(http.StatusBadRequest, errorValue)
 		return errors.New(errorValue)
 	}
 
-	switch strings.ToLower(grantType) {
+	switch strings.ToLower(authBasic.Grant_type) {
 	case "password":
 		pass := new(OAuthPassword)
 		if err := c.Bind(pass); err != nil {
