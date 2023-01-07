@@ -1,7 +1,9 @@
 package oauth
 
 import (
+	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -22,7 +24,7 @@ func NewAuthorization(c *OAuthConfigure, s *OAuthSimpleOption, e *echo.Echo) *Au
 
 func (a *Authorization) CreateAuthRouter() *echo.Group {
 	authRouter := a.e.Group(a.options.AuthRouter)
-	authRouter.POST("/", a.LoginOAuth)
+	authRouter.POST("", a.LoginOAuth)
 
 	return authRouter
 }
@@ -30,7 +32,12 @@ func (a *Authorization) CreateAuthRouter() *echo.Group {
 func (a *Authorization) LoginOAuth(c echo.Context) error {
 	authBasic := new(OAuthBasic)
 
-	if err := c.Bind(authBasic); err != nil {
+	body, err := ioutil.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.String(http.StatusBadRequest, "Bad request")
+	}
+
+	if err := json.Unmarshal(body, &authBasic); err != nil {
 		c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
 		return err
 	}
@@ -44,7 +51,7 @@ func (a *Authorization) LoginOAuth(c echo.Context) error {
 	switch strings.ToLower(authBasic.Grant_type) {
 	case "password":
 		pass := new(OAuthPassword)
-		if err := c.Bind(pass); err != nil {
+		if err := json.Unmarshal(body, &pass); err != nil {
 			c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
 			return err
 		}
@@ -129,10 +136,12 @@ func (a *Authorization) GenerateToken(authBasic AuthorizationRolesBasic, expires
 	claims := AuthClaims{
 		authBasic.Claims,
 		authBasic.Roles,
+		authBasic.Permissions,
 		jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			Issuer:    a.options.Issuer,
 			Audience:  a.options.Audience,
+			Subject:   authBasic.Subject,
 		},
 	}
 

@@ -39,9 +39,11 @@ type OAuthRefreshToken struct {
 }
 
 type AuthorizationRolesBasic struct {
-	Authorized bool                   `json:"authorized"`
-	Claims     map[string]interface{} `json:"claims,omitempty"`
-	Roles      []string               `json:"roles,omitempty"`
+	Authorized  bool                   `json:"authorized"`
+	Claims      map[string]interface{} `json:"claims,omitempty"`
+	Roles       []string               `json:"roles,omitempty"`
+	Subject     string                 `json:"roles,omitempty"`
+	Permissions []string               `json:"permissions,omitempty"`
 }
 
 type AuthorizationRolesPassword struct {
@@ -72,7 +74,8 @@ type OAuthSimpleOption struct {
 }
 
 type AuthClaims struct {
-	Claims map[string]interface{} `json:"claims,omitempty"`
-	Roles  []string               `json:"roles,omitempty"`
+	Claims      map[string]interface{} `json:"claims,omitempty"`
+	Roles       []string               `json:"roles,omitempty"`
+	Permissions []string               `json:"permissions,omitempty"`
 	jwt.RegisteredClaims
 }
