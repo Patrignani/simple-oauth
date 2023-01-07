@@ -1,0 +1,5 @@
+/.project
+**/vendor
+/launch.json
+.vscode
+.idea
