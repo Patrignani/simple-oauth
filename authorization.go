@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -38,9 +39,11 @@ func (a *Authorization) LoginOAuth(c echo.Context) error {
 	}
 
 	if err := json.Unmarshal(body, &authBasic); err != nil {
-		c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
+		c.JSON(http.StatusBadRequest, "Error decode "+err.Error())
 		return err
 	}
+
+	bodyReader := bytes.NewReader(body)
 
 	if len(authBasic.Grant_type) == 0 {
 		errorValue := "empty grant_type"
@@ -51,7 +54,7 @@ func (a *Authorization) LoginOAuth(c echo.Context) error {
 	switch strings.ToLower(authBasic.Grant_type) {
 	case "password":
 		pass := new(OAuthPassword)
-		if err := json.Unmarshal(body, &pass); err != nil {
+		if err := json.NewDecoder(bodyReader).Decode(&pass); err != nil {
 			c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
 			return err
 		}
@@ -59,7 +62,7 @@ func (a *Authorization) LoginOAuth(c echo.Context) error {
 		a.CreateResponsePassword(roles, c)
 	case "client_credentials":
 		client := new(OAuthClient)
-		if err := c.Bind(client); err != nil {
+		if err := json.NewDecoder(bodyReader).Decode(&client); err != nil {
 			c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
 			return err
 		}
@@ -67,7 +70,7 @@ func (a *Authorization) LoginOAuth(c echo.Context) error {
 		a.CreateResponseClient(roles, c)
 	case "refresh_token":
 		refresh := new(OAuthRefreshToken)
-		if err := c.Bind(refresh); err != nil {
+		if err := json.NewDecoder(bodyReader).Decode(&refresh); err != nil {
 			c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
 			return err
 		}
