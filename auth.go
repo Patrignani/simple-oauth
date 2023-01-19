@@ -42,7 +42,7 @@ type AuthorizationRolesBasic struct {
 	Authorized  bool                   `json:"authorized"`
 	Claims      map[string]interface{} `json:"claims,omitempty"`
 	Roles       []string               `json:"roles,omitempty"`
-	Subject     string                 `json:"roles,omitempty"`
+	Subject     string                 `json:"subject,omitempty"`
 	Permissions []string               `json:"permissions,omitempty"`
 }
 
