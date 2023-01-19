@@ -87,7 +87,7 @@ func (a *Authorization) LoginOAuth(c echo.Context) error {
 
 func (a *Authorization) CreateResponseClient(authorizationRolesClient AuthorizationRolesClient, c echo.Context) {
 	if authorizationRolesClient.Authorized {
-		expire := time.Now().Add(time.Minute * time.Duration(a.options.ExpireTimeMinutes))
+		expire := time.Now().Add(time.Minute * time.Duration(a.options.ExpireTimeMinutesClient))
 		token, err := a.GenerateToken(authorizationRolesClient.AuthorizationRolesBasic, expire)
 
 		if err != nil {

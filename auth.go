@@ -66,11 +66,12 @@ type OAuthConfigure struct {
 }
 
 type OAuthSimpleOption struct {
-	Key               string   `json:"key"`
-	Audience          []string `json:"audience"`
-	ExpireTimeMinutes int      `json:"expire_time_minutes"`
-	Issuer            string   `json:"Issuer"`
-	AuthRouter        string   `json:"auth_router"`
+	Key                     string   `json:"key"`
+	Audience                []string `json:"audience"`
+	ExpireTimeMinutes       int      `json:"expire_time_minutes"`
+	ExpireTimeMinutesClient int      `json:"expire_time_minutes"`
+	Issuer                  string   `json:"Issuer"`
+	AuthRouter              string   `json:"auth_router"`
 }
 
 type AuthClaims struct {
