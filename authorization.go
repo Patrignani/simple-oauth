@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 type Authorization struct {
@@ -156,4 +157,18 @@ func (a *Authorization) GenerateToken(authBasic AuthorizationRolesBasic, expires
 	}
 
 	return &t, nil
+}
+
+func (a *Authorization) GetDefaultMiddleWareJwtValidate() echo.MiddlewareFunc {
+
+	return a.GetMiddleWareJwtValidate(middleware.JWTConfig{
+		SigningMethod: "HS256",
+		SigningKey:    []byte(a.options.Key),
+		TokenLookup:   "header:Authorization",
+		Claims:        jwt.MapClaims{},
+	})
+}
+
+func (a *Authorization) GetMiddleWareJwtValidate(opt middleware.JWTConfig) echo.MiddlewareFunc {
+	return middleware.JWTWithConfig(opt)
 }
