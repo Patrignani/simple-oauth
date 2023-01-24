@@ -166,7 +166,6 @@ func (a *Authorization) GetDefaultMiddleWareJwtValidate() echo.MiddlewareFunc {
 		SigningMethod: "HS256",
 		SigningKey:    []byte(a.options.Key),
 		TokenLookup:   "header:Authorization",
-		Claims:        jwt.MapClaims{},
 	})
 }
 
@@ -194,7 +193,7 @@ func (a *Authorization) PermissionAndRoleMiddleware(permissions string, roles st
 				roles := claims["roles"].([]interface{})
 
 				for _, role := range roles {
-					userPermissions = append(userPermissions, role.(string))
+					userRoles = append(userRoles, role.(string))
 				}
 			}
 
