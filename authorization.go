@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	t "github.com/golang-jwt/jwt"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -176,8 +177,8 @@ func (a *Authorization) GetMiddleWareJwtValidate(opt middleware.JWTConfig) echo.
 func (a *Authorization) PermissionAndRoleMiddleware(permissions string, roles string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			user := c.Get("user").(*jwt.Token)
-			claims := user.Claims.(jwt.MapClaims)
+			user := c.Get("user").(*t.Token)
+			claims := user.Claims.(t.MapClaims)
 			userPermissions := []string{}
 			userRoles := []string{}
 
