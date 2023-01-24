@@ -172,3 +172,57 @@ func (a *Authorization) GetDefaultMiddleWareJwtValidate() echo.MiddlewareFunc {
 func (a *Authorization) GetMiddleWareJwtValidate(opt middleware.JWTConfig) echo.MiddlewareFunc {
 	return middleware.JWTWithConfig(opt)
 }
+
+func (a *Authorization) PermissionAndRoleMiddleware(permissions string, roles string) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			user := c.Get("user").(*jwt.Token)
+			claims := user.Claims.(jwt.MapClaims)
+			userPermissions := []string{}
+			userRoles := []string{}
+
+			if claims["permissions"] != nil {
+				permissions := claims["permissions"].([]interface{})
+
+				for _, permision := range permissions {
+					userPermissions = append(userPermissions, permision.(string))
+				}
+			}
+
+			if claims["roles"] != nil {
+				roles := claims["roles"].([]interface{})
+
+				for _, role := range roles {
+					userPermissions = append(userPermissions, role.(string))
+				}
+			}
+
+			hasPermission := false
+			hasRole := false
+			permissionList := strings.Split(permissions, ",")
+			roleList := strings.Split(roles, ",")
+			for _, role := range userRoles {
+				for _, r := range roleList {
+					if role == r {
+						hasRole = true
+						break
+					}
+				}
+			}
+			if !hasRole {
+				for _, permission := range userPermissions {
+					for _, p := range permissionList {
+						if permission == p {
+							hasPermission = true
+							break
+						}
+					}
+				}
+			}
+			if !hasPermission && !hasRole {
+				return echo.ErrForbidden
+			}
+			return next(c)
+		}
+	}
+}
