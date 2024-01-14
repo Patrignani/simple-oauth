@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	echojwt "github.com/labstack/echo-jwt/v4"
+
 	t "github.com/golang-jwt/jwt"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 )
 
 type Authorization struct {
@@ -35,7 +36,7 @@ func (a *Authorization) CreateAuthRouter() *echo.Group {
 func (a *Authorization) LoginOAuth(c echo.Context) error {
 	authBasic := new(OAuthBasic)
 
-	body, err := ioutil.ReadAll(c.Request().Body)
+	body, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		return c.String(http.StatusBadRequest, "Bad request")
 	}
@@ -162,15 +163,15 @@ func (a *Authorization) GenerateToken(authBasic AuthorizationRolesBasic, expires
 
 func (a *Authorization) GetDefaultMiddleWareJwtValidate() echo.MiddlewareFunc {
 
-	return a.GetMiddleWareJwtValidate(middleware.JWTConfig{
+	return a.GetMiddleWareJwtValidate(echojwt.Config{
 		SigningMethod: "HS256",
 		SigningKey:    []byte(a.options.Key),
 		TokenLookup:   "header:Authorization",
 	})
 }
 
-func (a *Authorization) GetMiddleWareJwtValidate(opt middleware.JWTConfig) echo.MiddlewareFunc {
-	return middleware.JWTWithConfig(opt)
+func (a *Authorization) GetMiddleWareJwtValidate(opt echojwt.Config) echo.MiddlewareFunc {
+	return echojwt.WithConfig(opt)
 }
 
 func (a *Authorization) PermissionAndRoleMiddleware(permissions string, roles string) echo.MiddlewareFunc {
