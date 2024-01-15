@@ -5,6 +5,8 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+type RolesPermissions string
+
 type OAuthBasic struct {
 	Grant_type    string `json:"grant_type"`
 	Client_id     string `json:"client_id"`

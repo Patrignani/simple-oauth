@@ -175,7 +175,7 @@ func (a *Authorization) GetMiddleWareJwtValidate(opt echojwt.Config) echo.Middle
 	return echojwt.WithConfig(opt)
 }
 
-func (a *Authorization) RolesMiddleware(rolesValue string) echo.MiddlewareFunc {
+func (a *Authorization) RolesMiddleware(roleList ...RolesPermissions) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			user := c.Get("user").(*jwt.Token)
@@ -191,10 +191,9 @@ func (a *Authorization) RolesMiddleware(rolesValue string) echo.MiddlewareFunc {
 			}
 
 			hasRole := false
-			roleList := strings.Split(rolesValue, ",")
 			for _, role := range userRoles {
 				for _, r := range roleList {
-					if role == r {
+					if role == string(r) {
 						hasRole = true
 						break
 					}
