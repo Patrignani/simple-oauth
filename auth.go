@@ -1,6 +1,9 @@
 package oauth
 
-import "github.com/golang-jwt/jwt/v4"
+import (
+	t "github.com/golang-jwt/jwt/v5"
+	"github.com/labstack/echo/v4"
+)
 
 type OAuthBasic struct {
 	Grant_type    string `json:"grant_type"`
@@ -39,11 +42,10 @@ type OAuthRefreshToken struct {
 }
 
 type AuthorizationRolesBasic struct {
-	Authorized  bool                   `json:"authorized"`
-	Claims      map[string]interface{} `json:"claims,omitempty"`
-	Roles       []string               `json:"roles,omitempty"`
-	Subject     string                 `json:"subject,omitempty"`
-	Permissions []string               `json:"permissions,omitempty"`
+	Authorized bool              `json:"authorized"`
+	Claims     map[string]string `json:"claims,omitempty"`
+	Roles      []string          `json:"roles,omitempty"`
+	Subject    string            `json:"subject,omitempty"`
 }
 
 type AuthorizationRolesPassword struct {
@@ -63,6 +65,7 @@ type OAuthConfigure struct {
 	PasswordAuthorization                func(pass *OAuthPassword) AuthorizationRolesPassword
 	ClientCredentialsAuthorization       func(client *OAuthClient) AuthorizationRolesClient
 	RefreshTokenCredentialsAuthorization func(refresh *OAuthRefreshToken) AuthorizationRolesRefresh
+	CustomActionRolesMiddleware          func(c echo.Context, token *t.Token, claims t.MapClaims) error
 }
 
 type OAuthSimpleOption struct {
@@ -72,11 +75,4 @@ type OAuthSimpleOption struct {
 	ExpireTimeMinutesClient int      `json:"expire_time_minutes_client"`
 	Issuer                  string   `json:"Issuer"`
 	AuthRouter              string   `json:"auth_router"`
-}
-
-type AuthClaims struct {
-	Claims      map[string]interface{} `json:"claims,omitempty"`
-	Roles       []string               `json:"roles,omitempty"`
-	Permissions []string               `json:"permissions,omitempty"`
-	jwt.RegisteredClaims
 }

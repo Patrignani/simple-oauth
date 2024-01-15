@@ -11,8 +11,7 @@ import (
 
 	echojwt "github.com/labstack/echo-jwt/v4"
 
-	t "github.com/golang-jwt/jwt"
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 )
 
@@ -139,16 +138,19 @@ func (a *Authorization) CreateResponsePassword(authorizationRoles AuthorizationR
 }
 
 func (a *Authorization) GenerateToken(authBasic AuthorizationRolesBasic, expiresAt time.Time) (*string, error) {
-	claims := AuthClaims{
-		authBasic.Claims,
-		authBasic.Roles,
-		authBasic.Permissions,
-		jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expiresAt),
-			Issuer:    a.options.Issuer,
-			Audience:  a.options.Audience,
-			Subject:   authBasic.Subject,
-		},
+
+	claims := jwt.MapClaims{
+		"roles":     authBasic.Roles,
+		"subject":   authBasic.Subject,
+		"audience":  a.options.Audience,
+		"issuer":    a.options.Issuer,
+		"expiresAt": jwt.NewNumericDate(expiresAt),
+	}
+
+	if authBasic.Claims != nil && len(authBasic.Claims) > 0 {
+		for key, value := range authBasic.Claims {
+			claims[key] = value
+		}
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -166,7 +168,6 @@ func (a *Authorization) GetDefaultMiddleWareJwtValidate() echo.MiddlewareFunc {
 	return a.GetMiddleWareJwtValidate(echojwt.Config{
 		SigningMethod: "HS256",
 		SigningKey:    []byte(a.options.Key),
-		TokenLookup:   "header:Authorization",
 	})
 }
 
@@ -174,21 +175,12 @@ func (a *Authorization) GetMiddleWareJwtValidate(opt echojwt.Config) echo.Middle
 	return echojwt.WithConfig(opt)
 }
 
-func (a *Authorization) PermissionAndRoleMiddleware(permissions string, roles string) echo.MiddlewareFunc {
+func (a *Authorization) RolesMiddleware(rolesValue string) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			user := c.Get("user").(*t.Token)
-			claims := user.Claims.(t.MapClaims)
-			userPermissions := []string{}
+			user := c.Get("user").(*jwt.Token)
+			claims := user.Claims.(jwt.MapClaims)
 			userRoles := []string{}
-
-			if claims["permissions"] != nil {
-				permissions := claims["permissions"].([]interface{})
-
-				for _, permision := range permissions {
-					userPermissions = append(userPermissions, permision.(string))
-				}
-			}
 
 			if claims["roles"] != nil {
 				roles := claims["roles"].([]interface{})
@@ -198,10 +190,8 @@ func (a *Authorization) PermissionAndRoleMiddleware(permissions string, roles st
 				}
 			}
 
-			hasPermission := false
 			hasRole := false
-			permissionList := strings.Split(permissions, ",")
-			roleList := strings.Split(roles, ",")
+			roleList := strings.Split(rolesValue, ",")
 			for _, role := range userRoles {
 				for _, r := range roleList {
 					if role == r {
@@ -211,18 +201,15 @@ func (a *Authorization) PermissionAndRoleMiddleware(permissions string, roles st
 				}
 			}
 			if !hasRole {
-				for _, permission := range userPermissions {
-					for _, p := range permissionList {
-						if permission == p {
-							hasPermission = true
-							break
-						}
-					}
-				}
-			}
-			if !hasPermission && !hasRole {
 				return echo.ErrForbidden
 			}
+
+			if a.authConfigure.CustomActionRolesMiddleware != nil {
+				if err := a.authConfigure.CustomActionRolesMiddleware(c, user, claims); err != nil {
+					return err
+				}
+			}
+
 			return next(c)
 		}
 	}
