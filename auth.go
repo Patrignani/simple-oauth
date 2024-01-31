@@ -1,6 +1,8 @@
 package oauth
 
 import (
+	"context"
+
 	t "github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 )
@@ -64,9 +66,9 @@ type AuthorizationRolesRefresh struct {
 }
 
 type OAuthConfigure struct {
-	PasswordAuthorization                func(c echo.Context, pass *OAuthPassword) AuthorizationRolesPassword
-	ClientCredentialsAuthorization       func(c echo.Context, client *OAuthClient) AuthorizationRolesClient
-	RefreshTokenCredentialsAuthorization func(c echo.Context, refresh *OAuthRefreshToken) AuthorizationRolesRefresh
+	PasswordAuthorization                func(c context.Context, pass *OAuthPassword) AuthorizationRolesPassword
+	ClientCredentialsAuthorization       func(c context.Context, client *OAuthClient) AuthorizationRolesClient
+	RefreshTokenCredentialsAuthorization func(c context.Context, refresh *OAuthRefreshToken) AuthorizationRolesRefresh
 	CustomActionRolesMiddleware          func(c echo.Context, token *t.Token, claims t.MapClaims) error
 }
 

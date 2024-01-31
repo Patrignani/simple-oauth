@@ -35,6 +35,8 @@ func (a *Authorization) CreateAuthRouter() *echo.Group {
 func (a *Authorization) LoginOAuth(c echo.Context) error {
 	authBasic := new(OAuthBasic)
 
+	ctx := c.Request().Context()
+
 	body, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		return c.String(http.StatusBadRequest, "Bad request")
@@ -60,7 +62,7 @@ func (a *Authorization) LoginOAuth(c echo.Context) error {
 			c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
 			return err
 		}
-		roles := a.authConfigure.PasswordAuthorization(c, pass)
+		roles := a.authConfigure.PasswordAuthorization(ctx, pass)
 		a.CreateResponsePassword(roles, c)
 	case "client_credentials":
 		client := new(OAuthClient)
@@ -68,7 +70,7 @@ func (a *Authorization) LoginOAuth(c echo.Context) error {
 			c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
 			return err
 		}
-		roles := a.authConfigure.ClientCredentialsAuthorization(c, client)
+		roles := a.authConfigure.ClientCredentialsAuthorization(ctx, client)
 		a.CreateResponseClient(roles, c)
 	case "refresh_token":
 		refresh := new(OAuthRefreshToken)
@@ -76,7 +78,7 @@ func (a *Authorization) LoginOAuth(c echo.Context) error {
 			c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
 			return err
 		}
-		roles := a.authConfigure.RefreshTokenCredentialsAuthorization(c, refresh)
+		roles := a.authConfigure.RefreshTokenCredentialsAuthorization(ctx, refresh)
 		a.CreateResponsePassword(roles.AuthorizationRolesPassword, c)
 	default:
 		errorValue := "invalid grant_type"
