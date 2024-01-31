@@ -64,9 +64,9 @@ type AuthorizationRolesRefresh struct {
 }
 
 type OAuthConfigure struct {
-	PasswordAuthorization                func(pass *OAuthPassword) AuthorizationRolesPassword
-	ClientCredentialsAuthorization       func(client *OAuthClient) AuthorizationRolesClient
-	RefreshTokenCredentialsAuthorization func(refresh *OAuthRefreshToken) AuthorizationRolesRefresh
+	PasswordAuthorization                func(c echo.Context, pass *OAuthPassword) AuthorizationRolesPassword
+	ClientCredentialsAuthorization       func(c echo.Context, client *OAuthClient) AuthorizationRolesClient
+	RefreshTokenCredentialsAuthorization func(c echo.Context, refresh *OAuthRefreshToken) AuthorizationRolesRefresh
 	CustomActionRolesMiddleware          func(c echo.Context, token *t.Token, claims t.MapClaims) error
 }
 
