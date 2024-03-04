@@ -140,11 +140,12 @@ func (a *Authorization) CreateResponsePassword(authorizationRoles AuthorizationR
 func (a *Authorization) GenerateToken(authBasic AuthorizationRolesBasic, expiresAt time.Time) (*string, error) {
 
 	claims := jwt.MapClaims{
-		"roles":     authBasic.Roles,
-		"subject":   authBasic.Subject,
-		"audience":  a.options.Audience,
-		"issuer":    a.options.Issuer,
-		"expiresAt": jwt.NewNumericDate(expiresAt),
+		"roles":    authBasic.Roles,
+		"subject":  authBasic.Subject,
+		"audience": a.options.Audience,
+		"issuer":   a.options.Issuer,
+		"exp":      jwt.NewNumericDate(expiresAt),
+		"iat":      time.Now().Unix(),
 	}
 
 	if authBasic.Claims != nil && len(authBasic.Claims) > 0 {
