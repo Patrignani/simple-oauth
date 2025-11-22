@@ -6,7 +6,7 @@ on:
       - main
 
 permissions:
-  contents: write  
+  contents: write
 
 jobs:
   test-and-tag:
@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
 
       - name: Configurar Go
         uses: actions/setup-go@v5
@@ -27,15 +29,12 @@ jobs:
       - name: Definir próximo número de tag
         id: tag
         run: |
-          # pega a última tag (ou v0.0.0 se não tiver tag ainda)
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Última tag: $LAST_TAG"
 
-          # remove o 'v' e separa em X.Y.Z
           VERSION=${LAST_TAG#v}
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
 
-          # incrementa PATCH
           PATCH=$((PATCH + 1))
           NEW_TAG="v$MAJOR.$MINOR.$PATCH"
 
@@ -45,7 +44,6 @@ jobs:
       - name: Criar e enviar nova tag
         run: |
           NEW_TAG=${{ steps.tag.outputs.new_tag }}
-          echo "Criando tag $NEW_TAG"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
