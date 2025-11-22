@@ -16,21 +16,31 @@ jobs:
       - name: Checkout código
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 
+          fetch-depth: 0  
+          fetch-tags: true
+
+      - name: Garantir fetch de tags
+        run: git fetch --tags --force
 
       - name: Configurar Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.1' 
+          go-version: '1.24.1'
 
       - name: Rodar testes
         run: go test ./...
 
-      - name: Definir próximo número de tag
+      - name: Definir próxima tag
         id: tag
         run: |
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Última tag: $LAST_TAG"
+          # pega a MAIOR tag semântica que começa com v
+          LAST_TAG=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+
+          if [ -z "$LAST_TAG" ]; then
+            LAST_TAG="v0.0.0"
+          fi
+
+          echo "Última tag encontrada: $LAST_TAG"
 
           VERSION=${LAST_TAG#v}
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
@@ -44,6 +54,8 @@ jobs:
       - name: Criar e enviar nova tag
         run: |
           NEW_TAG=${{ steps.tag.outputs.new_tag }}
+          echo "Criando tag $NEW_TAG"
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
