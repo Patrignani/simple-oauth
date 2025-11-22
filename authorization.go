@@ -4,38 +4,32 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 
-	echojwt "github.com/labstack/echo-jwt/v4"
-
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/labstack/echo/v4"
 )
 
 type Authorization struct {
 	authConfigure *OAuthConfigure
 	options       *OAuthSimpleOption
-	e             *echo.Echo
 }
 
-func NewAuthorization(c *OAuthConfigure, s *OAuthSimpleOption, e *echo.Echo) *Authorization {
-	return &Authorization{c, s, e}
+func NewAuthorization(c *OAuthConfigure, s *OAuthSimpleOption) *Authorization {
+	return &Authorization{c, s}
 }
 
-func (a *Authorization) CreateAuthRouter() *echo.Group {
-	authRouter := a.e.Group(a.options.AuthRouter)
-	authRouter.POST("", a.LoginOAuth)
-
-	return authRouter
+type HttpContext interface {
+	Body() ([]byte, error)
+	JSON(code int, i interface{}) error
+	String(code int, s string) error
 }
 
-func (a *Authorization) LoginOAuth(c echo.Context) error {
+func (a *Authorization) LoginOAuth(c HttpContext) error {
 	authBasic := new(OAuthBasic)
 
-	body, err := io.ReadAll(c.Request().Body)
+	body, err := c.Body()
 	if err != nil {
 		return c.String(http.StatusBadRequest, "Bad request")
 	}
@@ -60,7 +54,7 @@ func (a *Authorization) LoginOAuth(c echo.Context) error {
 			c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
 			return err
 		}
-		roles := a.authConfigure.PasswordAuthorization(c, pass)
+		roles := a.authConfigure.PasswordAuthorization(pass)
 		a.CreateResponsePassword(roles, c)
 	case "client_credentials":
 		client := new(OAuthClient)
@@ -68,7 +62,7 @@ func (a *Authorization) LoginOAuth(c echo.Context) error {
 			c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
 			return err
 		}
-		roles := a.authConfigure.ClientCredentialsAuthorization(c, client)
+		roles := a.authConfigure.ClientCredentialsAuthorization(client)
 		a.CreateResponseClient(roles, c)
 	case "refresh_token":
 		refresh := new(OAuthRefreshToken)
@@ -76,7 +70,7 @@ func (a *Authorization) LoginOAuth(c echo.Context) error {
 			c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
 			return err
 		}
-		roles := a.authConfigure.RefreshTokenCredentialsAuthorization(c, refresh)
+		roles := a.authConfigure.RefreshTokenCredentialsAuthorization(refresh)
 		a.CreateResponsePassword(roles.AuthorizationRolesPassword, c)
 	default:
 		errorValue := "invalid grant_type"
@@ -87,13 +81,14 @@ func (a *Authorization) LoginOAuth(c echo.Context) error {
 	return nil
 }
 
-func (a *Authorization) CreateResponseClient(authorizationRolesClient AuthorizationRolesClient, c echo.Context) {
+func (a *Authorization) CreateResponseClient(authorizationRolesClient AuthorizationRolesClient, c HttpContext) {
 	if authorizationRolesClient.Authorized {
 		expire := time.Now().Add(time.Minute * time.Duration(a.options.ExpireTimeMinutesClient))
 		token, err := a.GenerateToken(authorizationRolesClient.AuthorizationRolesBasic, expire)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, err)
+			return
 		}
 
 		result := AuthorizationClientPass{
@@ -110,18 +105,17 @@ func (a *Authorization) CreateResponseClient(authorizationRolesClient Authorizat
 	}
 }
 
-func (a *Authorization) CreateResponsePassword(authorizationRoles AuthorizationRolesPassword, c echo.Context) {
-
+func (a *Authorization) CreateResponsePassword(authorizationRoles AuthorizationRolesPassword, c HttpContext) {
 	if authorizationRoles.Authorized {
 		expire := time.Now().Add(time.Minute * time.Duration(a.options.ExpireTimeMinutes))
 		token, err := a.GenerateToken(authorizationRoles.AuthorizationRolesBasic, expire)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, err)
+			return
 		}
 
 		result := AuthorizationRefreshPass{
-
 			AuthorizationBasic{
 				Access_token: *token,
 				Token_type:   "Bearer",
@@ -134,11 +128,9 @@ func (a *Authorization) CreateResponsePassword(authorizationRoles AuthorizationR
 	} else {
 		c.JSON(http.StatusUnauthorized, "")
 	}
-
 }
 
 func (a *Authorization) GenerateToken(authBasic AuthorizationRolesBasic, expiresAt time.Time) (*string, error) {
-
 	claims := jwt.MapClaims{
 		"roles":    authBasic.Roles,
 		"subject":  authBasic.Subject,
@@ -148,7 +140,7 @@ func (a *Authorization) GenerateToken(authBasic AuthorizationRolesBasic, expires
 		"iat":      time.Now().Unix(),
 	}
 
-	if authBasic.Claims != nil && len(authBasic.Claims) > 0 {
+	if len(authBasic.Claims) > 0 {
 		for key, value := range authBasic.Claims {
 			claims[key] = value
 		}
@@ -162,55 +154,4 @@ func (a *Authorization) GenerateToken(authBasic AuthorizationRolesBasic, expires
 	}
 
 	return &t, nil
-}
-
-func (a *Authorization) GetDefaultMiddleWareJwtValidate() echo.MiddlewareFunc {
-
-	return a.GetMiddleWareJwtValidate(echojwt.Config{
-		SigningMethod: "HS256",
-		SigningKey:    []byte(a.options.Key),
-	})
-}
-
-func (a *Authorization) GetMiddleWareJwtValidate(opt echojwt.Config) echo.MiddlewareFunc {
-	return echojwt.WithConfig(opt)
-}
-
-func (a *Authorization) RolesMiddleware(roleList ...RolesPermissions) echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			user := c.Get("user").(*jwt.Token)
-			claims := user.Claims.(jwt.MapClaims)
-			userRoles := []string{}
-
-			if claims["roles"] != nil {
-				roles := claims["roles"].([]interface{})
-
-				for _, role := range roles {
-					userRoles = append(userRoles, role.(string))
-				}
-			}
-
-			hasRole := false
-			for _, role := range userRoles {
-				for _, r := range roleList {
-					if role == string(r) {
-						hasRole = true
-						break
-					}
-				}
-			}
-			if !hasRole {
-				return echo.ErrForbidden
-			}
-
-			if a.authConfigure.CustomActionRolesMiddleware != nil {
-				if err := a.authConfigure.CustomActionRolesMiddleware(c, user, claims); err != nil {
-					return err
-				}
-			}
-
-			return next(c)
-		}
-	}
 }
