@@ -12,6 +12,14 @@ type fiberContext struct {
 	*fiber.Ctx
 }
 
+func (c fiberContext) Set(key string, val interface{}) {
+	c.Ctx.Locals(key, val)
+}
+
+func (c fiberContext) Get(key string) interface{} {
+	return c.Ctx.Locals(key)
+}
+
 func (c fiberContext) Body() ([]byte, error) {
 	return c.Ctx.Body(), nil
 }
@@ -29,7 +37,7 @@ func (c fiberContext) RequestContext() context.Context {
 }
 
 func (c fiberContext) Header(key string) string {
-	return c.Get(key)
+	return c.Ctx.Get(key)
 }
 
 func (a *Authorization) FiberHandler() fiber.Handler {

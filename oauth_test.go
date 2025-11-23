@@ -40,6 +40,13 @@ func (f *fakeContext) String(code int, s string) error {
 	return nil
 }
 
+func (f *fakeContext) Set(key string, val interface{}) {
+}
+
+func (f *fakeContext) Get(key string) interface{} {
+	return nil
+}
+
 // NOVOS MÉTODOS EXIGIDOS PELO HttpContext
 func (f *fakeContext) RequestContext() context.Context {
 	return context.Background()

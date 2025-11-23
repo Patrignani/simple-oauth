@@ -9,6 +9,9 @@ type HttpContext interface {
 
 	RequestContext() context.Context
 	Header(key string) string
+
+	Set(key string, val interface{})
+	Get(key string) interface{}
 }
 
 type RequestCtx = HttpContext
