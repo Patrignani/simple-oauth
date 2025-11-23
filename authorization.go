@@ -20,12 +20,6 @@ func NewAuthorization(c *OAuthConfigure, s *OAuthSimpleOption) *Authorization {
 	return &Authorization{c, s}
 }
 
-type HttpContext interface {
-	Body() ([]byte, error)
-	JSON(code int, i interface{}) error
-	String(code int, s string) error
-}
-
 func (a *Authorization) LoginOAuth(c HttpContext) error {
 	authBasic := new(OAuthBasic)
 
@@ -35,47 +29,57 @@ func (a *Authorization) LoginOAuth(c HttpContext) error {
 	}
 
 	if err := json.Unmarshal(body, &authBasic); err != nil {
-		c.JSON(http.StatusBadRequest, "Error decode "+err.Error())
+		_ = c.JSON(http.StatusBadRequest, "Error decode "+err.Error())
 		return err
 	}
 
 	bodyReader := bytes.NewReader(body)
 
 	if len(authBasic.Grant_type) == 0 {
-		errorValue := "empty grant_type"
-		c.JSON(http.StatusBadRequest, errorValue)
-		return errors.New(errorValue)
+		errMsg := "empty grant_type"
+		_ = c.JSON(http.StatusBadRequest, errMsg)
+		return errors.New(errMsg)
 	}
 
 	switch strings.ToLower(authBasic.Grant_type) {
+
 	case "password":
 		pass := new(OAuthPassword)
 		if err := json.NewDecoder(bodyReader).Decode(&pass); err != nil {
-			c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
+			_ = c.JSON(http.StatusBadRequest,
+				"Request body is invalid due to the type of the grant_type. "+err.Error())
 			return err
 		}
-		roles := a.authConfigure.PasswordAuthorization(pass)
+
+		roles := a.authConfigure.PasswordAuthorization(c, pass)
 		a.CreateResponsePassword(roles, c)
+
 	case "client_credentials":
 		client := new(OAuthClient)
 		if err := json.NewDecoder(bodyReader).Decode(&client); err != nil {
-			c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
+			_ = c.JSON(http.StatusBadRequest,
+				"Request body is invalid due to the type of the grant_type. "+err.Error())
 			return err
 		}
-		roles := a.authConfigure.ClientCredentialsAuthorization(client)
+
+		roles := a.authConfigure.ClientCredentialsAuthorization(c, client)
 		a.CreateResponseClient(roles, c)
+
 	case "refresh_token":
 		refresh := new(OAuthRefreshToken)
 		if err := json.NewDecoder(bodyReader).Decode(&refresh); err != nil {
-			c.JSON(http.StatusBadRequest, "Request body is invalid due to the type of the grant_type. "+err.Error())
+			_ = c.JSON(http.StatusBadRequest,
+				"Request body is invalid due to the type of the grant_type. "+err.Error())
 			return err
 		}
-		roles := a.authConfigure.RefreshTokenCredentialsAuthorization(refresh)
+
+		roles := a.authConfigure.RefreshTokenCredentialsAuthorization(c, refresh)
 		a.CreateResponsePassword(roles.AuthorizationRolesPassword, c)
+
 	default:
-		errorValue := "invalid grant_type"
-		c.JSON(http.StatusBadRequest, errorValue)
-		return errors.New(errorValue)
+		errMsg := "invalid grant_type"
+		_ = c.JSON(http.StatusBadRequest, errMsg)
+		return errors.New(errMsg)
 	}
 
 	return nil
@@ -85,9 +89,8 @@ func (a *Authorization) CreateResponseClient(authorizationRolesClient Authorizat
 	if authorizationRolesClient.Authorized {
 		expire := time.Now().Add(time.Minute * time.Duration(a.options.ExpireTimeMinutesClient))
 		token, err := a.GenerateToken(authorizationRolesClient.AuthorizationRolesBasic, expire)
-
 		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			_ = c.JSON(http.StatusBadRequest, err)
 			return
 		}
 
@@ -99,19 +102,19 @@ func (a *Authorization) CreateResponseClient(authorizationRolesClient Authorizat
 			},
 		}
 
-		c.JSON(http.StatusOK, result)
-	} else {
-		c.JSON(http.StatusUnauthorized, "")
+		_ = c.JSON(http.StatusOK, result)
+		return
 	}
+
+	_ = c.JSON(http.StatusUnauthorized, "")
 }
 
 func (a *Authorization) CreateResponsePassword(authorizationRoles AuthorizationRolesPassword, c HttpContext) {
 	if authorizationRoles.Authorized {
 		expire := time.Now().Add(time.Minute * time.Duration(a.options.ExpireTimeMinutes))
 		token, err := a.GenerateToken(authorizationRoles.AuthorizationRolesBasic, expire)
-
 		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			_ = c.JSON(http.StatusBadRequest, err)
 			return
 		}
 
@@ -124,10 +127,11 @@ func (a *Authorization) CreateResponsePassword(authorizationRoles AuthorizationR
 			authorizationRoles.RefreshToken,
 		}
 
-		c.JSON(http.StatusOK, result)
-	} else {
-		c.JSON(http.StatusUnauthorized, "")
+		_ = c.JSON(http.StatusOK, result)
+		return
 	}
+
+	_ = c.JSON(http.StatusUnauthorized, "")
 }
 
 func (a *Authorization) GenerateToken(authBasic AuthorizationRolesBasic, expiresAt time.Time) (*string, error) {

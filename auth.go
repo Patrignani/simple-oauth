@@ -63,11 +63,10 @@ type AuthorizationRolesRefresh struct {
 }
 
 type OAuthConfigure struct {
-	PasswordAuthorization                func(pass *OAuthPassword) AuthorizationRolesPassword
-	ClientCredentialsAuthorization       func(client *OAuthClient) AuthorizationRolesClient
-	RefreshTokenCredentialsAuthorization func(refresh *OAuthRefreshToken) AuthorizationRolesRefresh
-
-	CustomActionRolesMiddleware func(token *jwt.Token, claims jwt.MapClaims) error
+	PasswordAuthorization                func(ctx RequestCtx, pass *OAuthPassword) AuthorizationRolesPassword
+	ClientCredentialsAuthorization       func(ctx RequestCtx, client *OAuthClient) AuthorizationRolesClient
+	RefreshTokenCredentialsAuthorization func(ctx RequestCtx, refresh *OAuthRefreshToken) AuthorizationRolesRefresh
+	CustomActionRolesMiddleware          func(ctx RequestCtx, token *jwt.Token, claims jwt.MapClaims) error
 }
 
 type OAuthSimpleOption struct {

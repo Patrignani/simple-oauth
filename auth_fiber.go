@@ -1,6 +1,8 @@
 package oauth
 
 import (
+	"context"
+
 	jwtware "github.com/gofiber/contrib/jwt"
 	"github.com/gofiber/fiber/v2"
 	jwt "github.com/golang-jwt/jwt/v5"
@@ -20,6 +22,14 @@ func (c fiberContext) JSON(code int, i interface{}) error {
 
 func (c fiberContext) String(code int, s string) error {
 	return c.Status(code).SendString(s)
+}
+
+func (c fiberContext) RequestContext() context.Context {
+	return c.Context()
+}
+
+func (c fiberContext) Header(key string) string {
+	return c.Get(key)
 }
 
 func (a *Authorization) FiberHandler() fiber.Handler {
@@ -46,7 +56,7 @@ func (a *Authorization) FiberRolesMiddleware(roleList ...RolesPermissions) fiber
 		}
 
 		if a.authConfigure != nil && a.authConfigure.CustomActionRolesMiddleware != nil {
-			if err := a.authConfigure.CustomActionRolesMiddleware(userToken, claims); err != nil {
+			if err := a.authConfigure.CustomActionRolesMiddleware(fiberContext{c}, userToken, claims); err != nil {
 				return err
 			}
 		}

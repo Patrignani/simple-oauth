@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"context"
 	"io"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -14,6 +15,22 @@ type echoContext struct {
 
 func (c echoContext) Body() ([]byte, error) {
 	return io.ReadAll(c.Request().Body)
+}
+
+func (c echoContext) JSON(code int, i interface{}) error {
+	return c.Context.JSON(code, i)
+}
+
+func (c echoContext) String(code int, s string) error {
+	return c.Context.String(code, s)
+}
+
+func (c echoContext) RequestContext() context.Context {
+	return c.Request().Context()
+}
+
+func (c echoContext) Header(key string) string {
+	return c.Request().Header.Get(key)
 }
 
 func (a *Authorization) EchoHandler() echo.HandlerFunc {
@@ -67,7 +84,7 @@ func (a *Authorization) EchoRolesMiddleware(roleList ...RolesPermissions) echo.M
 			}
 
 			if a.authConfigure != nil && a.authConfigure.CustomActionRolesMiddleware != nil {
-				if err := a.authConfigure.CustomActionRolesMiddleware(user, claims); err != nil {
+				if err := a.authConfigure.CustomActionRolesMiddleware(echoContext{c}, user, claims); err != nil {
 					return err
 				}
 			}

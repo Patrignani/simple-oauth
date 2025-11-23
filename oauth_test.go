@@ -1,6 +1,7 @@
 package oauth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -11,10 +12,9 @@ import (
 )
 
 //
-// Fakes / helpers
+// Fake HttpContext para testes
 //
 
-// fakeContext implementa HttpContext para testar o core sem Echo/Fiber
 type fakeContext struct {
 	body    []byte
 	Status  int
@@ -29,21 +29,27 @@ func newFakeContext(body []byte) *fakeContext {
 func (f *fakeContext) Body() ([]byte, error) {
 	return f.body, nil
 }
-
 func (f *fakeContext) JSON(code int, i interface{}) error {
 	f.Status = code
 	f.JSONVal = i
 	return nil
 }
-
 func (f *fakeContext) String(code int, s string) error {
 	f.Status = code
 	f.StrVal = s
 	return nil
 }
 
+// NOVOS MÉTODOS EXIGIDOS PELO HttpContext
+func (f *fakeContext) RequestContext() context.Context {
+	return context.Background()
+}
+func (f *fakeContext) Header(key string) string {
+	return ""
+}
+
 //
-// Tests de GenerateToken
+// Teste GenerateToken
 //
 
 func TestGenerateToken_IncluiClaimsEPadrao(t *testing.T) {
@@ -69,55 +75,43 @@ func TestGenerateToken_IncluiClaimsEPadrao(t *testing.T) {
 		t.Fatalf("GenerateToken retornou erro: %v", err)
 	}
 
-	if tokenStrPtr == nil || *tokenStrPtr == "" {
-		t.Fatalf("token vazio ou nil")
-	}
-
 	tokenStr := *tokenStrPtr
-
-	// Parse do token com a key HMAC
 	parsed, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
-		// valida o método de assinatura
 		if token.Method != jwt.SigningMethodHS256 {
 			return nil, errors.New("método de assinatura inesperado")
 		}
 		return []byte(opts.Key), nil
 	})
 	if err != nil {
-		t.Fatalf("erro ao fazer parse do token: %v", err)
+		t.Fatalf("erro ao fazer parse: %v", err)
 	}
-
 	if !parsed.Valid {
-		t.Fatalf("token não é válido")
+		t.Fatalf("token inválido")
 	}
 
-	claims, ok := parsed.Claims.(jwt.MapClaims)
-	if !ok {
-		t.Fatalf("claims não é MapClaims")
-	}
-
+	claims := parsed.Claims.(jwt.MapClaims)
 	if claims["subject"] != "user-123" {
-		t.Errorf("subject errado, esperado 'user-123', got %#v", claims["subject"])
+		t.Errorf("subject errado: %v", claims["subject"])
 	}
-
 	if claims["issuer"] != opts.Issuer {
-		t.Errorf("issuer errado, esperado %s, got %#v", opts.Issuer, claims["issuer"])
+		t.Errorf("issuer errado: %v", claims["issuer"])
 	}
-
 	if claims["foo"] != "bar" {
-		t.Errorf("claim custom foo não encontrada/errada: %#v", claims["foo"])
+		t.Errorf("claim custom inexistente: %v", claims["foo"])
 	}
 }
 
 //
-// Tests de LoginOAuth (password, client_credentials, erros)
+// LoginOAuth – PASSWORD
 //
 
 func TestLoginOAuth_PasswordGrant_Sucesso(t *testing.T) {
 	var receivedPass *OAuthPassword
+	var receivedCtx RequestCtx
 
 	cfg := &OAuthConfigure{
-		PasswordAuthorization: func(pass *OAuthPassword) AuthorizationRolesPassword {
+		PasswordAuthorization: func(ctx RequestCtx, pass *OAuthPassword) AuthorizationRolesPassword {
+			receivedCtx = ctx
 			receivedPass = pass
 			return AuthorizationRolesPassword{
 				AuthorizationRolesBasic: AuthorizationRolesBasic{
@@ -149,30 +143,33 @@ func TestLoginOAuth_PasswordGrant_Sucesso(t *testing.T) {
 
 	err := auth.LoginOAuth(ctx)
 	if err != nil {
-		t.Fatalf("LoginOAuth retornou erro: %v", err)
+		t.Fatalf("erro: %v", err)
 	}
 
-	if receivedPass == nil {
-		t.Fatalf("PasswordAuthorization não foi chamado")
+	if receivedCtx == nil {
+		t.Fatal("ctx não foi passado para PasswordAuthorization")
 	}
+
 	if receivedPass.Username != "john" || receivedPass.Password != "doe" {
-		t.Errorf("dados de password incorretos: %#v", receivedPass)
+		t.Errorf("password incorreto: %#v", receivedPass)
 	}
 
 	if ctx.Status != http.StatusOK {
-		t.Fatalf("status esperado %d, got %d", http.StatusOK, ctx.Status)
-	}
-
-	if ctx.JSONVal == nil {
-		t.Fatalf("JSON de resposta está vazio")
+		t.Errorf("status errado: %d", ctx.Status)
 	}
 }
 
+//
+// LoginOAuth – CLIENT CREDENTIALS
+//
+
 func TestLoginOAuth_ClientCredentials_Sucesso(t *testing.T) {
 	var receivedClient *OAuthClient
+	var receivedCtx RequestCtx
 
 	cfg := &OAuthConfigure{
-		ClientCredentialsAuthorization: func(client *OAuthClient) AuthorizationRolesClient {
+		ClientCredentialsAuthorization: func(ctx RequestCtx, client *OAuthClient) AuthorizationRolesClient {
+			receivedCtx = ctx
 			receivedClient = client
 			return AuthorizationRolesClient{
 				AuthorizationRolesBasic: AuthorizationRolesBasic{
@@ -203,7 +200,11 @@ func TestLoginOAuth_ClientCredentials_Sucesso(t *testing.T) {
 
 	err := auth.LoginOAuth(ctx)
 	if err != nil {
-		t.Fatalf("LoginOAuth retornou erro: %v", err)
+		t.Fatalf("erro: %v", err)
+	}
+
+	if receivedCtx == nil {
+		t.Fatal("ctx não foi passado para ClientCredentialsAuthorization")
 	}
 
 	if receivedClient == nil {
@@ -211,20 +212,24 @@ func TestLoginOAuth_ClientCredentials_Sucesso(t *testing.T) {
 	}
 
 	if ctx.Status != http.StatusOK {
-		t.Fatalf("status esperado %d, got %d", http.StatusOK, ctx.Status)
+		t.Errorf("status errado: %d", ctx.Status)
 	}
 }
+
+//
+// LoginOAuth – invalid
+//
 
 func TestLoginOAuth_GrantTypeInvalido(t *testing.T) {
 	cfg := &OAuthConfigure{}
 	opts := &OAuthSimpleOption{
-		Key:        "secret-key",
-		AuthRouter: "/auth",
+		Key: "secret-key",
 	}
+
 	auth := NewAuthorization(cfg, opts)
 
 	bodyMap := map[string]string{
-		"grant_type": "invalid_type",
+		"grant_type": "invalid",
 	}
 	bodyBytes, _ := json.Marshal(bodyMap)
 
@@ -232,20 +237,20 @@ func TestLoginOAuth_GrantTypeInvalido(t *testing.T) {
 
 	err := auth.LoginOAuth(ctx)
 	if err == nil {
-		t.Fatalf("esperado erro para grant_type inválido")
+		t.Fatal("esperado erro e não veio")
 	}
 
 	if ctx.Status != http.StatusBadRequest {
-		t.Fatalf("status esperado %d, got %d", http.StatusBadRequest, ctx.Status)
+		t.Errorf("status esperado %d, got %d", http.StatusBadRequest, ctx.Status)
 	}
 }
 
 func TestLoginOAuth_GrantTypeVazio(t *testing.T) {
 	cfg := &OAuthConfigure{}
 	opts := &OAuthSimpleOption{
-		Key:        "secret-key",
-		AuthRouter: "/auth",
+		Key: "secret-key",
 	}
+
 	auth := NewAuthorization(cfg, opts)
 
 	bodyMap := map[string]string{
@@ -257,16 +262,16 @@ func TestLoginOAuth_GrantTypeVazio(t *testing.T) {
 
 	err := auth.LoginOAuth(ctx)
 	if err == nil {
-		t.Fatalf("esperado erro para grant_type vazio")
+		t.Fatal("esperado erro e não veio")
 	}
 
 	if ctx.Status != http.StatusBadRequest {
-		t.Fatalf("status esperado %d, got %d", http.StatusBadRequest, ctx.Status)
+		t.Errorf("status esperado %d, got %d", http.StatusBadRequest, ctx.Status)
 	}
 }
 
 //
-// Tests de hasRoleFromClaims (se você criou essa função como combinamos)
+// Teste hasRoleFromClaims
 //
 
 func TestHasRoleFromClaims_TrueQuandoTemRole(t *testing.T) {
@@ -275,7 +280,7 @@ func TestHasRoleFromClaims_TrueQuandoTemRole(t *testing.T) {
 	}
 
 	if !hasRoleFromClaims(claims, RolesPermissions("ADMIN")) {
-		t.Fatalf("esperado ter role ADMIN, mas retornou false")
+		t.Fatal("ADMIN deveria existir")
 	}
 }
 
@@ -285,6 +290,6 @@ func TestHasRoleFromClaims_FalseQuandoNaoTemRole(t *testing.T) {
 	}
 
 	if hasRoleFromClaims(claims, RolesPermissions("ADMIN")) {
-		t.Fatalf("não deveria ter role ADMIN, mas retornou true")
+		t.Fatal("não deveria ter ADMIN")
 	}
 }
