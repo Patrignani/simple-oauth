@@ -51,6 +51,12 @@ func (a *Authorization) GetFiberDefaultMiddleWareJwtValidate() fiber.Handler {
 		SigningKey: jwtware.SigningKey{
 			Key: []byte(a.options.Key),
 		},
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "unauthorized",
+				"msg":   err.Error(),
+			})
+		},
 	})
 }
 
